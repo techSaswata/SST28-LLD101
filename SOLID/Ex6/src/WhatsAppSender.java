@@ -1,13 +1,13 @@
 public class WhatsAppSender extends NotificationSender {
-    public WhatsAppSender(AuditLog audit) { super(audit); }
+    public WhatsAppSender(AuditLog audit, NotificationValidator validator) { super(audit, validator); }
 
     @Override
-    public void send(Notification n) {
-        // LSP violation: tightens precondition
-        if (n.phone == null || !n.phone.startsWith("+")) {
-            throw new IllegalArgumentException("phone must start with + and country code");
-        }
-        System.out.println("WA -> to=" + n.phone + " body=" + n.body);
+    public SendResult send(Notification n) {
+        SendResult validation = validator.validateWhatsAppPhone(n);
+        if (!validation.ok) return validation;
+        String body = n.body == null ? "" : n.body;
+        System.out.println("WA -> to=" + n.phone + " body=" + body);
         audit.add("wa sent");
+        return SendResult.ok();
     }
 }
