@@ -1,0 +1,132 @@
+# Ex6 — My Notes (LSP Fix: Notification Sender)
+
+---
+
+## What the problem asks to do
+
+We have a campus system that sends notifications — via Email, SMS, and WhatsApp.
+
+There is one parent class `NotificationSender` and three children: `EmailSender`, `SmsSender`, `WhatsAppSender`.
+
+The problem says: **these children are misbehaving**. Each one does something unexpected compared to what the parent promised. Fix them so any child can be used in place of the parent without surprises.
+
+---
+
+## The concept being used: LSP (Liskov Substitution Principle)
+
+Think of it like this:
+
+> If your mom says "any vehicle can take you to school", then a bicycle, a car, or a bus should all work.
+> But if one of them suddenly explodes when you sit on it — that's a broken promise.
+
+**LSP says:** A child class must keep the same promises as the parent. It should not demand extra things, throw unexpected errors, or silently change the meaning of things.
+
+---
+
+## What was broken (Before the fix)
+
+### EmailSender
+- It was **secretly cutting the message short** (truncating to 40 characters) without telling anyone.
+- The parent never said "I will cut your message". So this is a broken promise.
+
+### WhatsAppSender
+- If the phone number did not start with `+`, it would **throw a crash** (`RuntimeException`).
+- The parent's `send()` never said it could throw. So callers had to wrap it in `try-catch` just for WhatsApp — that's bad.
+
+### SmsSender
+- It was silently ignoring `subject`. Fine on its own, but the base contract was vague — nobody knew what fields would or wouldn't be used.
+
+### The real root problem
+- `send()` returned `void` — there was no way to know if it succeeded or failed.
+- Validation logic was scattered inside each sender — each one had its own rules, decided on its own.
+
+---
+
+## Steps to identify and understand what to do
+
+**Step 1 — Read Main.java and see the ugly part**
+
+In `Main.java`, WhatsApp had a `try-catch` that no other sender needed. That's a red flag — it means the callers had to know which sender might crash. That breaks LSP.
+
+**Step 2 — Ask: "what is the base contract?"**
+
+The base class `NotificationSender` said:
+```
+public abstract void send(Notification n);
+```
+It returns nothing. It might crash. It might silently do weird things. That's a vague and dangerous contract.
+
+**Step 3 — Fix the contract first**
+
+Change the return type from `void` to `SendResult`. Now every sender must return either "it worked" or "it failed with this reason". No crashes, no silent weirdness.
+
+**Step 4 — Create SendResult**
+
+A simple class with two fields: `ok` (true/false) and `errorMessage` (the reason if it failed).
+
+**Step 5 — Pull validation out of each sender**
+
+Create `NotificationValidator` — one class that knows the rules for each channel:
+- Email needs a valid email address
+- SMS needs a phone number
+- WhatsApp needs a phone number that starts with `+`
+
+Now each sender just calls the validator, gets a `SendResult` back, and returns it. No one throws. No one hides things.
+
+**Step 6 — Update Main.java**
+
+Instead of `try-catch`, just check `waResult.ok`. Clean, simple, no surprises.
+
+---
+
+## UML Diagram
+
+```
+         +----------------------+
+         |  NotificationSender  |  (abstract)
+         |----------------------|
+         | - audit: AuditLog    |
+         | - validator: NotificationValidator |
+         |----------------------|
+         | + send(n): SendResult|  ← base contract, must be honored
+         +----------+-----------+
+                    |
+       +------------+-------------+
+       |            |             |
++------+------+ +---+-----+ +-----+------+
+| EmailSender | |SmsSender| |WhatsAppSender|
+|-------------| |---------| |------------|
+| send(n)     | | send(n) | |  send(n)   |
+| → validate  | | → valid | |  → valid   |
+| → print     | | → print | |  → print   |
+| → ok()      | | → ok()  | |  → ok()    |
++-------------+ +---------+ +------------+
+       |                          |
+       +--------+   +-------------+
+                |   |
+       +--------+---+----------+
+       | NotificationValidator |
+       |-----------------------|
+       | validateEmail(n)      |
+       | validatePhone(n)      |
+       | validateWhatsAppPhone |
+       +-----------+-----------+
+                   |
+           returns SendResult
+
++------------------+
+|    SendResult    |
+|------------------|
+| ok: boolean      |
+| errorMessage: String |
+|------------------|
+| ok()             |  ← factory: success
+| error(msg)       |  ← factory: failure
++------------------+
+```
+
+---
+
+## The story in one paragraph
+
+We had three senders that all extended the same parent — but each was doing its own weird thing behind the scenes. One was quietly chopping messages. One was throwing a crash. The parent's promise was too vague. So we fixed the promise first: `send()` now returns a `SendResult` instead of `void`, so you always know what happened. Then we moved all the "is this input valid?" logic into one place — `NotificationValidator`. Each sender now just asks the validator, gets a clean yes/no back, and returns it. No crashes. No silent cuts. No surprises. If you give any sender to someone who only knows the parent class, it will behave exactly as expected. That is LSP.
