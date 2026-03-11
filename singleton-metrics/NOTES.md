@@ -62,6 +62,8 @@ That's the only change — one line. But it's the critical one.
 
 If the constructor is `public`, anyone can make `new MetricsRegistry()`. Make it `private`.
 
+We opened `MetricsRegistry.java` and saw `public MetricsRegistry()` — completely exposed. We changed it to `private MetricsRegistry()`. That alone would block `new MetricsRegistry()` from compiling anywhere outside the class.
+
 **Step 2 — Fix thread safety with the Static Holder idiom**
 
 Instead of checking `if (INSTANCE == null)` yourself (which is racy), let the JVM do it for you:
@@ -75,17 +77,25 @@ public static MetricsRegistry getInstance() {
 ```
 The inner class `Holder` is only loaded when `getInstance()` is first called. The JVM guarantees class loading is thread-safe. No locks needed.
 
+We deleted the old `getInstance()` that had the racy `if (INSTANCE == null)` check. We created a private static inner class `Holder` with `static final MetricsRegistry INSTANCE = new MetricsRegistry()`. We rewrote `getInstance()` to just return `Holder.INSTANCE`. The JVM handles thread safety for free during class loading.
+
 **Step 3 — Block reflection**
 
 Add a `static volatile boolean instanceCreated` flag. In the constructor, check it — if already `true`, throw. This stops someone from doing `Constructor.setAccessible(true)` and calling it anyway.
+
+We added `private static volatile boolean instanceCreated = false;` to the class. In the private constructor, we added: if `instanceCreated` is true, throw `IllegalStateException`; otherwise set it to true. Now even reflection cannot create a second instance.
 
 **Step 4 — Block serialization**
 
 Add `readResolve()` that returns `getInstance()`. When Java deserializes the object, it calls this method instead of using the deserialized one.
 
+We added `private Object readResolve() { return getInstance(); }` to the class. There was a TODO comment marking exactly where this should go — we filled it in.
+
 **Step 5 — Fix MetricsLoader**
 
 Change `new MetricsRegistry()` to `MetricsRegistry.getInstance()`. Done.
+
+We opened `MetricsLoader.java`, found `MetricsRegistry registry = new MetricsRegistry();` — which now wouldn't compile anyway since the constructor is private. We replaced it with `MetricsRegistry registry = MetricsRegistry.getInstance();`.
 
 ---
 

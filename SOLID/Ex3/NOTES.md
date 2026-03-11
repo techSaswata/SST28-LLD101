@@ -49,6 +49,8 @@ This is one big chain. If you want to add a new rule like "GPA must be above 7",
 
 Each rule does the same thing: look at the student profile → if something is wrong → return a reason string → else return null (meaning "pass").
 
+We read `EligibilityEngine.evaluate` and saw four if/else branches — each checking one condition on the `StudentProfile` and returning a different failure string. The shape was identical for every branch: check one field, return a message or null.
+
 **Step 2 — Create an interface for that pattern**
 
 ```java
@@ -59,6 +61,8 @@ interface EligibilityRule {
 
 Every rule is now one class that implements this.
 
+We created the `EligibilityRule` interface with a single method `String failureReason(StudentProfile s)`. This interface became the abstraction that all rule classes would implement.
+
 **Step 3 — Create one class per rule**
 
 - `DisciplinaryFlagRule` → checks if the flag is set
@@ -67,6 +71,8 @@ Every rule is now one class that implements this.
 - `CreditsRule` → checks credits
 
 Each class is small, focused, and independent.
+
+We created `DisciplinaryFlagRule`, `CgrRule`, `AttendanceRule`, and `CreditsRule` — each implementing `EligibilityRule`. Each class had one field (the threshold value) and one method that returned the failure message or null.
 
 **Step 4 — Replace the if/else chain with a loop**
 
@@ -79,9 +85,13 @@ for (EligibilityRule rule : rules) {
 }
 ```
 
+We replaced the entire if/else chain in `EligibilityEngine.evaluate` with a for-loop over a `List<EligibilityRule>`. The engine now accepts the list via its constructor — it doesn't hardcode which rules it runs.
+
 **Step 5 — Adding a new rule in the future**
 
 Just create a new class `NewRule implements EligibilityRule` and add it to the list. You never touch `EligibilityEngine` again.
+
+We verified by imagining adding a new rule: create a new class implementing `EligibilityRule`, add it to the list passed into `EligibilityEngine`'s constructor — zero changes to the engine itself.
 
 ---
 

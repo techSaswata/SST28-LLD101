@@ -72,23 +72,33 @@ Minor fix: regex pattern had `\s` (wrong in Java string) changed to `\\s` (corre
 
 Remove setters. All fields get `private final`. Constructor becomes private (only Builder calls it).
 
+We changed every field in `IncidentTicket` from `private String` to `private final String` (and `private final List<String>` for tags). We removed all 6 setter methods. We made the constructor private so it can only be called from the Builder.
+
 **Step 2 — Defensive copy on tags**
 
 In the constructor: `this.tags = Collections.unmodifiableList(new ArrayList<>(builder.tags))`.
 - `new ArrayList<>(builder.tags)` — copies the list so the builder's list can't affect the ticket
 - `Collections.unmodifiableList(...)` — wraps it so outside code can't add/remove via `getTags()`
 
+We changed the tags field assignment in the constructor to: `this.tags = Collections.unmodifiableList(new ArrayList<>(builder.tags))`. This defensive copy means the builder's list and the ticket's list are separate — no aliasing.
+
 **Step 3 — Create the Builder**
 
 Required fields go in Builder's constructor. Optional fields have setter-style methods that return `this` (fluent). `build()` validates everything and calls `new IncidentTicket(this)`.
+
+We added a `static class Builder` inside `IncidentTicket`. Required fields (`id`, `reporterEmail`, `title`) go in Builder's constructor. Optional fields (`priority`, `tags`, `assigneeEmail`, `source`) have fluent setter methods returning `this`. The `build()` method calls `Validation.validate(this)` and then `new IncidentTicket(this)`.
 
 **Step 4 — Add `toBuilder()`**
 
 For "updates", don't touch the old object. Instead: copy all values into a new Builder, change what you want, call `.build()`. Returns a brand new ticket.
 
+We added `public Builder toBuilder()` to `IncidentTicket`. It creates a new `Builder(id, reporterEmail, title)` and then calls all the optional setter methods to copy the current values. The caller can then chain `.assigneeEmail("new@x.com").build()` to get a modified copy.
+
 **Step 5 — Fix TicketService**
 
 Replace all `t.setX(...)` calls with `t.toBuilder().x(...).build()`. Methods that used to return `void` now return the new `IncidentTicket`.
+
+We updated `TicketService.createTicket()` to use the Builder and call `.build()` once — no setter calls after. We changed `assign()` and `escalateToCritical()` to return `IncidentTicket` and implement them as `return t.toBuilder().assigneeEmail(email).build()` and `return t.toBuilder().priority("CRITICAL").build()` respectively.
 
 ---
 

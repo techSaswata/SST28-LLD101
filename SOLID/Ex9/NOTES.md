@@ -48,9 +48,13 @@ The pipeline is the "big boss" — it decides the evaluation flow. But it was di
 - Someone grades the code → `CodeGraderService` interface
 - Someone writes the report → `ReportWriterService` interface
 
+We read `EvaluationPipeline.evaluate` and found three `new` calls right inside the method body: `new PlagiarismChecker()`, `new CodeGrader()`, `new ReportWriter()`. These were the concrete dependencies being hardcoded inside the high-level logic.
+
 **Step 2 — Create interfaces for each**
 
 Each interface has just one method (the one the pipeline calls).
+
+We created `PlagiarismCheckerService` with `check(Submission)`, `CodeGraderService` with `grade(Submission, Rubric)`, and `ReportWriterService` with `write(GradingResult)`. Three tiny interfaces.
 
 **Step 3 — Make the concrete classes implement those interfaces**
 
@@ -60,13 +64,19 @@ Each interface has just one method (the one the pipeline calls).
 
 The classes themselves don't change much — just add `implements`.
 
+We added `implements PlagiarismCheckerService`, `implements CodeGraderService`, and `implements ReportWriterService` to the existing concrete classes. The method signatures already matched — no logic changes needed.
+
 **Step 4 — Inject the dependencies via constructor**
 
 `EvaluationPipeline` now takes the interfaces in its constructor and stores them as fields. No more `new` inside the method.
 
+We rewrote `EvaluationPipeline`'s constructor to accept the three interfaces. We removed the three `new` calls from inside `evaluate`. The method now just calls `plagChecker.check(...)`, `grader.grade(...)`, `writer.write(...)` on the injected fields.
+
 **Step 5 — Main wires everything together**
 
 `Main` is the only place that calls `new PlagiarismChecker()`, `new CodeGrader()`, etc. It passes them to the pipeline constructor. This is called "wiring" — you assemble the pieces at the top, not inside the logic.
+
+We updated `Main` to create `new PlagiarismChecker()`, `new CodeGrader()`, `new ReportWriter()` and pass them into the `EvaluationPipeline` constructor. That one place in `Main` is now the only place that knows about the concrete classes.
 
 ---
 

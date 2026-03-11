@@ -111,21 +111,31 @@ out.add(new MapMarker(lat, lng, label, style));
 - Style (shape, color, size, filled) → same for many markers → intrinsic, shareable
 - Position (lat, lng, label) → unique per marker → extrinsic, not shared
 
+We read `MapMarker.java` and saw `this.style = new MarkerStyle(shape, color, size, filled)` in the constructor — every marker creating its own style object. We read `MarkerStyleFactory.java` and saw the cache was declared but never used — it always returned `new MarkerStyle(...)`. These were the two problems to fix.
+
 **Step 2 — Make `MarkerStyle` immutable**
 
 Remove all setters, make all fields `final`, make class `final`. Now it's safe to share — nobody can mutate the shared object.
+
+We changed all 4 fields in `MarkerStyle` from non-final to `private final`. We removed all 4 setter methods (`setShape`, `setColor`, `setSize`, `setFilled`). We added `final` to the class declaration itself.
 
 **Step 3 — Implement the factory cache**
 
 The factory has a `Map<String, MarkerStyle>`. Key = `"PIN|RED|12|F"` style. Check cache → hit: return existing. Miss: create, store, return.
 
+We rewrote the `get()` method in `MarkerStyleFactory` to first call `cache.get(key)`. If the result was null (cache miss), we created the object, put it in the cache, and returned it. If not null (cache hit), we returned the existing object directly. The key was the pipe-joined string like `PIN|RED|12|F`.
+
 **Step 4 — Change `MapMarker` to accept a `MarkerStyle`**
 
 Instead of building its own style, the marker just holds a reference to the shared one passed in from outside.
 
+We changed `MapMarker`'s constructor from taking `(double lat, double lng, String label, String shape, String color, int size, boolean filled)` to taking `(double lat, double lng, String label, MarkerStyle style)`. The `new MarkerStyle(...)` line inside the constructor was deleted. The marker just stores the reference passed in.
+
 **Step 5 — Use the factory in `MapDataSource`**
 
 Create one `MarkerStyleFactory` on the data source. For each marker, call `styleFactory.get(...)` to get the shared style, then pass it to `new MapMarker(...)`.
+
+We added `private final MarkerStyleFactory styleFactory = new MarkerStyleFactory();` to `MapDataSource`. In `loadMarkers()`, we replaced `new MapMarker(lat, lng, label, shape, color, size, filled)` with two lines: first `MarkerStyle style = styleFactory.get(shape, color, size, filled)`, then `new MapMarker(lat, lng, label, style)`. The factory is created once and reused for all markers.
 
 **Result**: 10,000 markers might share only 20 `MarkerStyle` objects. `QuickCheck` can verify this by checking `factory.cacheSize()`.
 

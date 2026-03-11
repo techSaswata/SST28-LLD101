@@ -56,9 +56,13 @@ Problems:
 - Something processes payment → `PaymentGatewayService` interface
 - Something calculates fare → `FareCalculator` interface (new — pulled out of the inline formula)
 
+We read `TransportBookingService.book` and found four `new` calls plus a hardcoded fare formula `50.0 + km * 6.6666666667` inline. The fare formula was a fifth responsibility hidden inside the booking logic.
+
 **Step 2 — Create interfaces for each role**
 
 Each has one method that the booking service needs.
+
+We created `DistanceCalculatorService`, `DriverAllocatorService`, `PaymentGatewayService`, and `FareCalculator` — each as a single-method interface. The fourth one (`FareCalculator`) was new — it didn't exist in the starter code at all.
 
 **Step 3 — Make concrete classes implement the interfaces**
 
@@ -67,13 +71,19 @@ Each has one method that the booking service needs.
 `PaymentGateway implements PaymentGatewayService`
 `DefaultFareCalculator implements FareCalculator` (new class that holds the pricing formula)
 
+We added `implements` to the three existing classes. We created `DefaultFareCalculator` as a new class with the fare formula `50.0 + km * 6.6666666667` moved into its `calculate(double km)` method.
+
 **Step 4 — Inject via constructor into TransportBookingService**
 
 The booking service stores them as fields. No `new` inside `book()` anymore.
 
+We rewrote `TransportBookingService`'s constructor to accept all four interfaces. We deleted the four `new` calls from `book()`. The fare formula line was replaced with `fareCalculator.fare(km)`.
+
 **Step 5 — Main wires everything**
 
 `Main` creates all the concretes and passes them in. The booking service just calls the interfaces — it doesn't know what's behind them.
+
+We updated `Main` to create `new DistanceCalculator()`, `new DriverAllocator()`, `new PaymentGateway()`, `new DefaultFareCalculator()` and wire them into the booking service constructor. `Main` is now the only assembly point.
 
 ---
 

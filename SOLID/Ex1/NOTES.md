@@ -49,6 +49,8 @@ Inside `OnboardingService.registerFromRawInput`, all this was happening in one m
 
 Open `OnboardingService.registerFromRawInput`. Count how many different things it does. You'll see: parsing, validating, ID-making, saving, printing — all in one place.
 
+We opened `OnboardingService.registerFromRawInput` and counted 5 different jobs happening in one method — string splitting, field checks, ID formatting, database save, and print statements. That confirmed the SRP violation.
+
 **Step 2 — Give each job its own class**
 
 - Parsing → `StudentInputParser` (reads raw string, returns a clean `StudentInput` object)
@@ -57,13 +59,19 @@ Open `OnboardingService.registerFromRawInput`. Count how many different things i
 - Saving → `StudentRepository` interface (so `OnboardingService` doesn't have to know about `FakeDb`)
 - Printing → `OnboardingPrinter` (prints the result to console)
 
+We created `StudentInputParser`, `StudentValidator`, `StudentIdGenerator` interface + `DefaultStudentIdGenerator`, `StudentRepository` interface, and `OnboardingPrinter` — each as a separate class. The parser returned a `StudentInput` object, the validator returned a list of error strings, the ID generator returned a formatted ID string.
+
 **Step 3 — Create a result object**
 
 `RegistrationResult` holds everything about what happened — was it a success? what errors? what record? — so the printer can just read this object and print. The service doesn't print anything itself.
 
+We created a `RegistrationResult` class with fields: `rawInput`, `errors`, `record`, `totalCount`, and factory methods `success(...)` and `failure(...)`. The printer reads this object and decides what to print — the service itself never calls `System.out.println`.
+
 **Step 4 — Clean up `OnboardingService`**
 
 Now `OnboardingService` just coordinates: call parser → call validator → call ID generator → call repo → return result. Done. It doesn't know how to print or how the DB works.
+
+We rewrote `OnboardingService.registerFromRawInput` to just call each helper in sequence: parse → validate → generate ID → save → return result. If validation fails, it returns early with a failure result. No formatting, no print, no direct DB access inside the service anymore.
 
 ---
 

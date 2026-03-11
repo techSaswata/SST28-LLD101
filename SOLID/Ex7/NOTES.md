@@ -49,9 +49,13 @@ Dummy implementations are dangerous. They look like they work but do nothing. If
 - `scanAttendance` → things that scan → `AttendanceScan`
 - `connectInput` → things that connect to an input source → `InputConnect`
 
+We read the original `SmartClassroomDevice` interface and listed all 6 methods. Then we looked at each device class and crossed off which methods had real implementations vs dummy no-ops. That grouping naturally gave us 5 capability buckets.
+
 **Step 2 — Create 5 small interfaces**
 
 Each interface has only the methods that logically belong together.
+
+We created `PowerControl`, `BrightnessControl`, `TemperatureControl`, `AttendanceScan`, and `InputConnect` as separate interfaces. Each had only 1–2 methods. The original fat `SmartClassroomDevice` interface was deleted.
 
 **Step 3 — Each device implements only what it actually does**
 
@@ -62,11 +66,15 @@ Each interface has only the methods that logically belong together.
 
 No dummies anywhere.
 
+We updated each device class: `Projector implements PowerControl, InputConnect`. `LightsPanel implements PowerControl, BrightnessControl`. `AirConditioner implements PowerControl, TemperatureControl`. `AttendanceScanner implements AttendanceScan`. Every dummy method was deleted.
+
 **Step 4 — Update ClassroomController and DeviceRegistry**
 
 `DeviceRegistry` now stores `Object` and finds devices by capability interface using generics (`getFirst(AttendanceScan.class)`).
 
 `ClassroomController` asks the registry: "give me the device that can scan", "give me the device that can control brightness" — it doesn't care what the device is, only what it can do.
+
+We updated `DeviceRegistry` to store `List<Object>` and added a `<T> T getFirst(Class<T> capability)` method that loops through the list and returns the first device that implements the given interface. `ClassroomController` was updated to call `registry.getFirst(InputConnect.class)`, `registry.getFirst(BrightnessControl.class)`, etc.
 
 ---
 

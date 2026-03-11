@@ -75,6 +75,8 @@ Uncommented — adapters are now wired into the registry map and passed to `Orde
 
 These don't match the `PaymentGateway` interface: `charge(customerId, amountCents)`.
 
+We read `FastPayClient.java` — it had `payNow(customerId, amountCents)` returning a String. We read `SafeCashClient.java` — it had `createPayment(amountCents, customerId)` returning a `SafeCashPayment`, and then you had to call `.confirm()` on that to get the transaction ID. Neither matched `PaymentGateway.charge(customerId, amountCents)`.
+
 **Step 2 — Create an adapter for each SDK**
 
 Each adapter:
@@ -82,13 +84,19 @@ Each adapter:
 - Implements `PaymentGateway`
 - In `charge()`, calls the SDK's method(s) and returns the transaction ID
 
+We created `FastPayAdapter.java` implementing `PaymentGateway`. Its `charge(customerId, amountCents)` method just calls `client.payNow(customerId, amountCents)` and returns the result. We created `SafeCashAdapter.java` implementing `PaymentGateway`. Its `charge()` method calls `client.createPayment(amountCents, customerId)` (note the reversed argument order) and then calls `.confirm()` on the returned payment object.
+
 **Step 3 — Register in the map in App**
 
 `App` creates the SDK clients, wraps them in adapters, and puts them in the map keyed by provider name.
 
+We opened `App.java` and found two commented-out TODO lines. We uncommented both: `gateways.put("fastpay", new FastPayAdapter(new FastPayClient()))` and `gateways.put("safecash", new SafeCashAdapter(new SafeCashClient()))`. The adapter wrapping happens here — the SDKs are created and immediately wrapped.
+
 **Step 4 — OrderService stays clean**
 
 `OrderService.charge("fastpay", ...)` → looks up `"fastpay"` in the map → gets back a `PaymentGateway` → calls `.charge()`. It doesn't know if it's FastPay or SafeCash behind it.
+
+We verified that `OrderService` was already written to only call `gateways.get(provider).charge(customerId, amountCents)`. It never imported `FastPayClient` or `SafeCashClient`. Our only job was to implement the two adapters and uncomment the wiring in App.
 
 To add a third payment provider tomorrow — write one new adapter class and add one line to the map in `App`. `OrderService` never changes.
 

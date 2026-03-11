@@ -52,6 +52,8 @@ If the cashier is also filing invoices, changing tax rules, AND printing — tha
 
 Read the method. You'll see: menu lookup, subtotal math, tax logic, discount logic, string formatting, print, save. That's 7 jobs.
 
+We read through `CafeteriaSystem.checkout` and found menu price lookups, subtotal loops, hardcoded tax percentages per customer type, hardcoded discount conditions, a `StringBuilder` building the invoice string, a `System.out.println`, and a `FileStore.save()` call — all in one method.
+
 **Step 2 — Move tax and discount behind interfaces**
 
 - `TaxPolicy` interface → `DefaultTaxPolicy` (knows the tax % per customer type)
@@ -59,21 +61,31 @@ Read the method. You'll see: menu lookup, subtotal math, tax logic, discount log
 
 Now if tax rules change, you only change `DefaultTaxPolicy`.
 
+We created `TaxPolicy` and `DiscountPolicy` interfaces. `DefaultTaxPolicy` stores tax rates per customer type. `DefaultDiscountPolicy` stores discount amounts based on customer type and order size. The concrete logic moved out of the checkout method into these classes.
+
 **Step 3 — Move pricing to its own calculator**
 
 `PricingCalculator` interface → `DefaultPricingCalculator` takes order lines + menu catalog, returns an `InvoicePricing` object (subtotal, lines with names and totals, count).
+
+We created `PricingCalculator` interface and `DefaultPricingCalculator`. The calculator takes the order lines and the menu catalog, looks up each item's price, and returns an `InvoicePricing` object with all line totals and the subtotal — the checkout method no longer does any price math.
 
 **Step 4 — Move formatting to `InvoiceFormatter`**
 
 `InvoiceFormatter.format(InvoiceData)` just builds the invoice string. It doesn't know about taxes or discounts — it just gets all the numbers already calculated and formats them.
 
+We created `InvoiceFormatter` with a `format(InvoiceData)` method. It uses a `StringBuilder` internally to build the receipt string. `CafeteriaSystem` passes a fully-populated `InvoiceData` object and gets back a formatted string to print.
+
 **Step 5 — Move store behind an interface**
 
 `InvoiceStore` interface → `FileStore` implements it. Now `CafeteriaSystem` doesn't know it's a file store.
 
+We changed `CafeteriaSystem` to take an `InvoiceStore` in its constructor. The existing `FileStore` was made to implement this interface — no logic changed in `FileStore`, just added `implements InvoiceStore`.
+
 **Step 6 — `CafeteriaSystem` becomes an orchestrator**
 
 It just calls: calculate pricing → get tax → get discount → create InvoiceData → format → print → save. Clean.
+
+We rewrote `checkout` to call each collaborator in sequence, collecting results into an `InvoiceData` object, then passing it to the formatter and then to the store. The method shrank to under 15 lines.
 
 ---
 

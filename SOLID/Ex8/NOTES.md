@@ -49,15 +49,21 @@ If `ClubConsole` accidentally called `treasurer.addMinutes(...)`, it would silen
 - `addMinutes` → minutes operations → `MinutesOps`
 - `createEvent`, `getEventsCount` → events operations → `EventsOps`
 
+We read `ClubAdminTools` and listed all 5 methods. Then we looked at which methods each tool actually had real code for vs which had empty bodies. The grouping by role was obvious from there.
+
 **Step 2 — Create 3 small interfaces**
 
 Each interface has only what that role needs.
+
+We created `FinanceOps` with `addIncome` and `addExpense`, `MinutesOps` with `addMinutes`, and `EventsOps` with `createEvent` and `getEventsCount`. The original `ClubAdminTools` interface was deleted.
 
 **Step 3 — Each tool implements only its own interface**
 
 - `TreasurerTool implements FinanceOps` — only addIncome and addExpense. No dummies.
 - `SecretaryTool implements MinutesOps` — only addMinutes. No dummies.
 - `EventLeadTool implements EventsOps` — only createEvent and getEventsCount. No dummies.
+
+We changed each tool's `implements` declaration: `TreasurerTool implements FinanceOps`, `SecretaryTool implements MinutesOps`, `EventLeadTool implements EventsOps`. All the dummy method bodies were removed. Each class shrank to only real code.
 
 **Step 4 — ClubConsole uses the right interface per role**
 
@@ -68,6 +74,8 @@ EventsOps lead       = new EventLeadTool(events);
 ```
 
 Now the compiler itself stops you from calling `treasurer.addMinutes(...)` — it's not even there.
+
+We updated `ClubConsole.run()` to declare the local variables as `FinanceOps treasurer`, `MinutesOps secretary`, `EventsOps lead` — changing the declared type from the old `ClubAdminTools` to the specific interfaces. These are local variables inside the method, not class fields. The compiler now enforces the role boundaries — you can't accidentally mix up which tool does what.
 
 ---
 

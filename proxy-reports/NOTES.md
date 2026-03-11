@@ -102,9 +102,13 @@ Both the proxy and the real report need to implement the same interface so the v
 interface Report { void display(User user); }
 ```
 
+We created the `Report` interface with a single `void display(User user)` method. Both `ReportProxy` and `RealReport` were made to implement it. `ReportFile` (the old class) was left as-is but was no longer used in App.
+
 **Step 2 — Build `RealReport` as the actual worker**
 
 `RealReport` does the slow disk load. It caches the content internally (`private String content`) so it only loads once even if `display()` is called multiple times.
+
+We added `private String content;` to `RealReport`. In `display()`, we added: if `content == null`, call `loadFromDisk()` (which simulates a 120ms delay and sets the content). Subsequent calls skip the disk load entirely.
 
 **Step 3 — Build `ReportProxy` as the gatekeeper**
 
@@ -113,13 +117,19 @@ The proxy holds the report metadata (id, title, classification) and a nullable `
 - If allowed and `cachedReport == null` — create the `RealReport` now (lazy).
 - Delegate to `cachedReport.display(user)`.
 
+We rewrote `ReportProxy.display(user)` with three parts: first call `accessControl.canAccess(user, classification)` — if false, print `[ACCESS DENIED]` and return. If true and `cachedReport == null`, create `new RealReport(reportId, title, classification)` and store it. Then call `cachedReport.display(user)`.
+
 **Step 4 — Update `ReportViewer` to use the interface**
 
 Change `ReportFile` → `Report` in the parameter. Now it works with proxies.
 
+We changed `ReportViewer.open(ReportFile report, User user)` to `ReportViewer.open(Report report, User user)`. One word changed — but now any `Report` implementation (proxy or real) can be passed in.
+
 **Step 5 — Wire it in `App`**
 
 Replace `new ReportFile(...)` with `new ReportProxy(...)`. Hold them as `Report` interface type.
+
+We updated `App` to declare three variables as `Report` (not `ReportFile`). We replaced `new ReportFile(...)` with `new ReportProxy(...)` for all three reports. The demo now shows the three proxy behaviors: denied access, lazy load on first authorized access, and cache hit on second access.
 
 ---
 

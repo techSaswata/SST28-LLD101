@@ -46,21 +46,31 @@ Imagine you order a "drink" at a canteen. It could be water, juice, or tea — b
 
 `Main` had a `try-catch` specifically for the PDF exporter. That's the red flag — callers should not need to know which exporter might throw. The base contract should cover all cases.
 
+We read `Main.java` and found a `try-catch(IllegalArgumentException)` block wrapping only the PDF export call. No other exporter needed that catch. That told us PdfExporter was violating LSP by throwing where the base contract didn't allow it.
+
 **Step 2 — Fix ExportResult to carry success/failure**
 
 Add `ok` (boolean) and `errorMessage` (String) to `ExportResult`. Now instead of throwing, exporters can return `ExportResult.error("reason")`. Clean, safe, no crash.
+
+We added `boolean ok` and `String errorMessage` fields to `ExportResult`, along with two factory methods: `ExportResult.ok(contentType, bytes)` for success and `ExportResult.error(message)` for failure. All existing `return new ExportResult(...)` calls were updated to use the factory methods.
 
 **Step 3 — Normalize null input in the base class**
 
 Add a `normalize(req)` helper in `Exporter` (the base class). Every child calls this first — it converts null into empty strings. Now all three exporters handle null the same way.
 
+We added a `protected ExportRequest normalize(ExportRequest req)` method to the `Exporter` base class. It returns an `ExportRequest` with empty strings replacing nulls. Each subclass calls `req = normalize(req)` at the start of their `export()` method.
+
 **Step 4 — PdfExporter returns error instead of throwing**
 
 Instead of `throw new IllegalArgumentException(...)`, it now returns `ExportResult.error("PDF cannot handle content > 20 chars")`.
 
+We changed `PdfExporter.export()` to replace the `throw new IllegalArgumentException(...)` with `return ExportResult.error("PDF content too long")`. The exporter now always returns a result — never throws.
+
 **Step 5 — Main becomes clean**
 
 No more `try-catch`. Just check `if (out.ok)` — same check for all exporters. Substitutable.
+
+We removed the try-catch from `Main` and replaced it with a simple `if (!result.ok)` check. The same check works for PDF, CSV, and JSON. The caller no longer needs to know anything about which exporter it's using.
 
 ---
 

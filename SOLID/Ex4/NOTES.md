@@ -57,15 +57,21 @@ There are two kinds of pricing decisions:
 
 These are just lookup tables. They don't need to be hardcoded in the calculator.
 
+We read `HostelFeeCalculator.calculateMonthly` and spotted two separate hardcoded tables: a `switch` for room type prices and an `if/else` chain for add-on prices. Both were just key→value lookups pretending to be logic.
+
 **Step 2 — Create interfaces for the two lookups**
 
 - `RoomRateProvider` → `Money baseFor(int roomType)`
 - `AddOnRateProvider` → `Money feeFor(AddOn addOn)`
 
+We created `RoomRateProvider` and `AddOnRateProvider` interfaces. The calculator would now depend only on these, not on any concrete implementation.
+
 **Step 3 — Create default implementations using maps**
 
 `DefaultRoomRateProvider` stores room type → price in a `HashMap`. No switch needed.
 `DefaultAddOnRateProvider` stores add-on → price in an `EnumMap`. No if/else needed.
+
+We created `DefaultRoomRateProvider` using a `HashMap<Integer, Money>` pre-populated with all room type prices. We created `DefaultAddOnRateProvider` using an `EnumMap<AddOn, Money>`. The switch and if/else chains were deleted entirely.
 
 **Step 4 — Inject them into `HostelFeeCalculator`**
 
@@ -79,9 +85,13 @@ for (AddOn a : req.addOns) {
 }
 ```
 
+We changed `HostelFeeCalculator`'s constructor to accept `RoomRateProvider` and `AddOnRateProvider`. The `calculateMonthly` method now calls `roomRates.baseFor(req.roomType)` and loops over add-ons calling `addOnRates.feeFor(a)`. No conditions in the calculator.
+
 **Step 5 — Adding new room/add-on in future**
 
 Just add a new entry in `DefaultRoomRateProvider` or `DefaultAddOnRateProvider`. The calculator code stays unchanged.
+
+We confirmed this by tracing through `App` — it creates `DefaultRoomRateProvider` and `DefaultAddOnRateProvider`, passes them to the calculator. To add "PENTHOUSE" room type, only `DefaultRoomRateProvider`'s map needs one new entry.
 
 ---
 
