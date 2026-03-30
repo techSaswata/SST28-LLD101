@@ -1,1 +1,0 @@
-solve it containing the design (class diagram) and the implementation of a movie ticket booking system
